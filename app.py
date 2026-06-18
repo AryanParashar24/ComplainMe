@@ -56,18 +56,22 @@ def save_uploads(uploaded_files) -> list[Path]:
 
 
 def render_header():
-    # Create two columns: one for the logo, one for the title
-    # This keeps them close and perfectly aligned
-    col1, col2 = st.columns([0.1, 1], vertical_alignment="center")
+    # We use a container with display: flex for the "Gmail-like" alignment.
+    # Note: src="app/static/logo.png" is the correct path for Streamlit static files.
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <img src="app/static/logo.png" style="width: 55px; height: auto;">
+            <h1 style="margin: 0; font-family: sans-serif; font-weight: 500;">Complain.io</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
-    with col1:
-        st.image("logo.png", width=55)
-        
-    with col2:
-        st.markdown("<h1 style='margin: 0; font-family: sans-serif; font-weight: 500;'>Complain.io</h1>", unsafe_allow_html=True)
-    
-    st.markdown("Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
-                "find the right government officials, and forward it with your photos/videos attached.")
+    st.markdown(
+        "Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
+        "find the right government officials, and forward it with your photos/videos attached."
+    )
     st.write("---")
     
 
