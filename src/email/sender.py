@@ -1,11 +1,8 @@
 import os
 import smtplib
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from urllib.parse import quote, urlencode
 
+from src.email.mime_builder import build_eml_bytes, build_mime_message
 from src.models.complaint import ProcessedComplaint
 
 MAX_COMPOSE_URL_LEN = 7500
@@ -136,37 +133,21 @@ def get_compose_links(
 def send_complaint_email_smtp(
     processed: ProcessedComplaint,
     cc_emails: list[str] | None = None,
+    smtp_user: str | None = None,
+    smtp_password: str | None = None,
 ) -> dict:
-    """Optional: send directly via SMTP if credentials are configured."""
+    """Optional: send directly via SMTP. Credentials from UI or .env."""
     recipients = processed.all_emails
     if not recipients:
         return {"success": False, "error": "No recipient emails found.", "sent_to": []}
 
-    if not _smtp_configured():
-        return {"success": False, "error": "SMTP credentials not configured.", "sent_to": []}
+    user = smtp_user or os.getenv("SMTP_USER", "")
+    password = smtp_password or os.getenv("SMTP_PASSWORD", "")
+    if not user or not password:
+        return {"success": False, "error": "SMTP credentials not provided.", "sent_to": []}
 
-    msg = MIMEMultipart()
-    msg["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))
-    msg["To"] = recipients[0]
-    if len(recipients) > 1:
-        msg["Cc"] = ", ".join(recipients[1:])
-    if cc_emails:
-        existing_cc = msg.get("Cc", "")
-        extra = ", ".join(cc_emails)
-        msg["Cc"] = f"{existing_cc}, {extra}" if existing_cc else extra
-
-    msg["Subject"] = processed.subject
-    msg.attach(MIMEText(processed.formal_letter, "plain", "utf-8"))
-
-    for media_path in processed.original.media_paths:
-        if not media_path.exists():
-            continue
-        with open(media_path, "rb") as f:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f"attachment; filename={media_path.name}")
-        msg.attach(part)
+    from_email = os.getenv("SMTP_FROM", user)
+    msg = build_mime_message(processed, cc_emails, from_email=from_email)
 
     all_recipients = list(recipients)
     if cc_emails:
@@ -174,14 +155,20 @@ def send_complaint_email_smtp(
 
     host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER", "")
-    password = os.getenv("SMTP_PASSWORD", "")
 
     try:
         with smtplib.SMTP(host, port, timeout=30) as server:
             server.starttls()
             server.login(user, password)
-            server.sendmail(msg["From"], all_recipients, msg.as_string())
+            server.sendmail(from_email, all_recipients, msg.as_string())
         return {"success": True, "sent_to": all_recipients, "subject": processed.subject}
     except smtplib.SMTPException as e:
         return {"success": False, "error": str(e), "sent_to": []}
+
+
+def build_eml_download(
+    processed: ProcessedComplaint,
+    cc_emails: list[str] | None = None,
+    from_email: str = "",
+) -> bytes:
+    return build_eml_bytes(processed, cc_emails, from_email)

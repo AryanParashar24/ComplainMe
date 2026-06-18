@@ -46,7 +46,11 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 | `SMTP_PASSWORD` | No | SMTP password or app password |
 | `SMTP_FROM` | No | From address (defaults to `SMTP_USER`) |
 
-Without SMTP, use **Open in Gmail** — the app pre-fills recipients, subject, and body in your logged-in Gmail. Attach photos/videos manually in Gmail before sending.
+Without SMTP, use **Send** tab options:
+- **Download .eml** — full email with photos/videos attached (open in any mail app)
+- **Share to Mail App** — on phone, opens Gmail with files attached
+- **Gmail OAuth draft** — saves a draft in Gmail browser with attachments (optional setup)
+- **Open in Gmail** — pre-fills text and recipients only (no auto-attach via URL)
 
 ## Project structure
 

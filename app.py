@@ -16,7 +16,17 @@ from src.ai.agent import (
     process_complaint,
     suggest_emails_for_authority,
 )
-from src.email.sender import get_compose_links, send_complaint_email_smtp
+from src.email.gmail_draft import (
+    create_gmail_draft,
+    credentials_from_session,
+    credentials_to_session,
+    exchange_code,
+    get_auth_url,
+    oauth_configured,
+)
+from src.email.mime_builder import load_attachment_payloads
+from src.email.sender import build_eml_download, get_compose_links, send_complaint_email_smtp
+from src.email.share_component import render_share_to_mail
 from src.models.complaint import ComplaintInput
 from src.scraper.email_finder import discover_all_emails
 
@@ -59,7 +69,7 @@ def render_complaint_form() -> ComplaintInput | None:
     col1, col2 = st.columns(2)
     with col1:
         state = st.selectbox("State / UT", [""] + CONFIG["indian_states"])
-        city = st.text_input("City / Town", placeholder="e.g. Pune, Lucknow, Bhopal")
+        city = st.text_input("City / Town", placeholder="e.g. Delhi, Bangalore, Lucknow")
     with col2:
         area = st.text_input("Area / Village / Locality (optional)", placeholder="e.g. Kothrud, Sector 12")
         department = st.selectbox(
@@ -219,8 +229,8 @@ def render_results():
 
     with tab_send:
         st.markdown(
-            "Send from **your own Gmail** — we pre-fill the formal letter and all official emails. "
-            "You just sign in (if needed) and hit Send. No passwords stored in this app."
+            "Send from **your own email** — recipients and formal letter are pre-filled. "
+            "Use the options below to include your photos/videos as attachments."
         )
 
         cc_user = False
@@ -229,54 +239,109 @@ def render_results():
 
         cc = [processed.original.email] if cc_user and processed.original.email else None
         links = get_compose_links(processed, cc_emails=cc)
+        has_media = bool(processed.original.media_paths)
 
         if not links.get("success"):
             st.error(links.get("error", "Could not build email links."))
-        else:
-            if links.get("body_truncated"):
-                st.warning(
-                    "The letter is long — Gmail opens with a short preview. "
-                    "Copy the full text from the **Formal Letter** tab and paste it in Gmail before sending."
-                )
+            return
 
-            if links.get("has_attachments"):
-                st.warning(
-                    "Photos/videos cannot be attached automatically via a web link. "
-                    "Please attach them manually in Gmail before sending."
-                )
+        st.markdown("**Recipients**")
+        st.write(f"**To:** {links['to']}")
+        if links["cc_list"]:
+            st.write(f"**CC:** {', '.join(links['cc_list'])}")
 
-            st.markdown("**Recipients**")
-            st.write(f"**To:** {links['to']}")
-            if links["cc_list"]:
-                st.write(f"**CC:** {', '.join(links['cc_list'])}")
+        if has_media:
+            st.subheader("Send with attachments")
+            st.caption("Gmail web links cannot auto-attach files — use one of these instead:")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.link_button(
-                    "📧 Open in Gmail (browser)",
-                    links["gmail_url"],
-                    use_container_width=True,
-                    help="Opens Gmail compose in your browser. Works best on desktop.",
-                )
-            with col2:
-                st.markdown(
-                    f'<a href="{links["mailto_url"]}" target="_blank" '
-                    f'style="display:block;text-align:center;padding:12px 20px;'
-                    f'background:#1a73e8;color:white;text-decoration:none;border-radius:8px;'
-                    f'font-weight:500;">📱 Open in Mail App</a>',
-                    unsafe_allow_html=True,
-                )
-                st.caption("On phone, this usually opens the Gmail app if installed.")
+            eml_data = build_eml_download(processed, cc_emails=cc, from_email=processed.original.email or "")
+            st.download_button(
+                "📥 Download email (.eml) with all attachments",
+                data=eml_data,
+                file_name="complaint_with_attachments.eml",
+                mime="message/rfc822",
+                use_container_width=True,
+                help="Open this file — your mail app loads the full email with photos/videos attached.",
+            )
+            st.caption("Desktop: open the .eml file (Outlook, Apple Mail, Thunderbird). It includes all media.")
 
-            with st.expander("Advanced: auto-send via SMTP (needs app password)"):
-                st.caption("Only use this if you have configured SMTP_USER and SMTP_PASSWORD in .env")
-                if st.button("Send automatically via SMTP"):
-                    with st.spinner("Sending..."):
-                        result = send_complaint_email_smtp(processed, cc_emails=cc)
-                    if result["success"]:
-                        st.success(f"Sent to {len(result['sent_to'])} recipient(s)!")
-                    else:
-                        st.error(f"SMTP failed: {result.get('error', 'Unknown error')}")
+            attachments = load_attachment_payloads(processed)
+            if attachments:
+                render_share_to_mail(processed.subject, processed.formal_letter, attachments)
+                st.caption("Phone: tap Share above → pick Gmail. Text + files are attached automatically.")
+
+            if oauth_configured():
+                if "gmail_token" not in st.session_state:
+                    st.link_button(
+                        "🔐 Sign in with Google → save Gmail draft (with attachments)",
+                        get_auth_url(),
+                        use_container_width=True,
+                    )
+                elif st.button("📧 Create Gmail draft with attachments", use_container_width=True):
+                    try:
+                        creds = credentials_from_session(st.session_state["gmail_token"])
+                        draft = create_gmail_draft(
+                            creds, processed, cc_emails=cc, from_email=processed.original.email or ""
+                        )
+                        st.session_state["gmail_draft_url"] = draft["drafts_url"]
+                        st.success("Draft saved in Gmail with all attachments! Open Drafts below.")
+                    except Exception as e:
+                        st.error(f"Could not create Gmail draft: {e}")
+                if st.session_state.get("gmail_draft_url"):
+                    st.link_button(
+                        "Open Gmail Drafts folder",
+                        st.session_state["gmail_draft_url"],
+                        use_container_width=True,
+                    )
+            else:
+                with st.expander("Optional: auto-attach in Gmail browser (one-time Google setup)"):
+                    st.markdown(
+                        "Add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` to `.env` "
+                        "to save a Gmail draft with attachments. See README."
+                    )
+
+            st.divider()
+
+        st.subheader("Quick open (text only)" if has_media else "Open in your mail app")
+        if links.get("body_truncated"):
+            st.warning(
+                "Letter is long — copy the full text from the **Formal Letter** tab if needed."
+            )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.link_button(
+                "📧 Open in Gmail (browser)",
+                links["gmail_url"],
+                use_container_width=True,
+            )
+        with col2:
+            st.markdown(
+                f'<a href="{links["mailto_url"]}" target="_blank" '
+                f'style="display:block;text-align:center;padding:12px 20px;'
+                f'background:#1a73e8;color:white;text-decoration:none;border-radius:8px;'
+                f'font-weight:500;">📱 Open in Mail App</a>',
+                unsafe_allow_html=True,
+            )
+        if has_media:
+            st.caption("These links pre-fill text and recipients only — use .eml or Share above for media.")
+
+        with st.expander("Advanced: send directly via Gmail app password"):
+            st.caption(
+                "Sends immediately with attachments. Use a [Gmail App Password](https://myaccount.google.com/apppasswords) "
+                "— not your normal login password."
+            )
+            smtp_user = st.text_input("Your Gmail", value=processed.original.email or "")
+            smtp_pass = st.text_input("Gmail App Password", type="password")
+            if st.button("Send now with attachments"):
+                with st.spinner("Sending..."):
+                    result = send_complaint_email_smtp(
+                        processed, cc_emails=cc, smtp_user=smtp_user, smtp_password=smtp_pass
+                    )
+                if result["success"]:
+                    st.success(f"Sent to {len(result['sent_to'])} recipient(s) with attachments!")
+                else:
+                    st.error(f"Send failed: {result.get('error', 'Unknown error')}")
 
 
 def render_sidebar():
@@ -299,7 +364,20 @@ def render_sidebar():
         st.info("Email opens in your Gmail — no SMTP password needed.")
 
 
+def handle_gmail_oauth_callback():
+    if not oauth_configured() or "code" not in st.query_params:
+        return
+    try:
+        creds = exchange_code(st.query_params["code"])
+        st.session_state["gmail_token"] = credentials_to_session(creds)
+        st.query_params.clear()
+        st.toast("Gmail connected — you can now create drafts with attachments.")
+    except Exception as e:
+        st.error(f"Gmail sign-in failed: {e}")
+
+
 def main():
+    handle_gmail_oauth_callback()
     render_header()
     render_sidebar()
 
