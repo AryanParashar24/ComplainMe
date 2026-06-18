@@ -56,20 +56,27 @@ def save_uploads(uploaded_files) -> list[Path]:
 
 
 def render_header():
-    # Defining the relative width of the columns for centering.
-    # Col1: left spacer, Col2: logo, Col3: right spacer.
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Use columns to create a tight side-by-side layout
+    # [1, 5] means the logo takes a small portion, and the title takes the rest
+    col1, col2 = st.columns([0.8, 5])
+    
+    with col1:
+        # Smaller width for the logo
+        st.image("logo.png", width=60)
+        
     with col2:
-        st.image("logo.png", width=250, use_container_width=True)
-        st.markdown("<h1 style='text-align: center; color: black;'>Complain.io</h1>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        # Align the title vertically with the logo using padding or HTML
+        st.markdown(
+            "<h2 style='margin-top: 5px; margin-bottom: 0;'>Complain.io</h2>", 
+            unsafe_allow_html=True
+        )
 
-    # Display the platform description below the centered header.
+    # Description below
     st.markdown(
-        "<div style='text-align: center; color: gray;'>Write your complaint in <b>plain, informal language</b> — we'll turn it into a formal letter, "
-        "find the right government officials, and forward it with your photos/videos attached.</div>",
-        unsafe_allow_html=True
+        "Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
+        "find the right government officials, and forward it with your photos/videos attached."
     )
+    st.write("") # Add a little extra space
 
 
 def render_complaint_form() -> ComplaintInput | None:
