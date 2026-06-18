@@ -61,7 +61,7 @@ def render_header():
     st.markdown(
         """
         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-            <img src="static/logo.png" style="width: 55px; height: auto;">
+            <img src="logo.png" style="width: 55px; height: auto;">
             <h1 style="margin: 0; font-family: sans-serif; font-weight: 500;">Complain.io</h1>
         </div>
         """,
