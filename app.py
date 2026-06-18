@@ -56,34 +56,24 @@ def save_uploads(uploaded_files) -> list[Path]:
 
 
 def render_header():
-    # Use a tighter column layout: 
-    # [0.4, 5] makes the first column very narrow, 
-    # but we will control the gap with the image width and spacing.
-    col1, col2 = st.columns([0.4, 5], gap="small")
+    # We use a container with display: flex to ensure perfect alignment
+    # between the image and the title.
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+            <img src="app/static/logo.png" style="width: 55px;">
+            <h1 style="margin: 0; font-family: sans-serif; font-weight: 500;">Complain.io</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
-    with col1:
-        # Increase width slightly to make it more visible (e.g., 80)
-        st.image("logo.png", width=80)
-        
-    with col2:
-        # Add padding-top to align the text vertically with the larger logo
-        st.markdown(
-            """
-            <div style="padding-top: 15px;">
-                <h2 style="margin: 0;">Complain.io</h2>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-
-    # Add a small vertical space after the header
-    st.write("") 
     st.markdown(
         "Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
         "find the right government officials, and forward it with your photos/videos attached."
     )
-    st.write("---") # Optional: adds a nice separator line
-
+    st.write("---")
+    
 
 def render_complaint_form() -> ComplaintInput | None:
     st.header("1. Tell us what's wrong")
