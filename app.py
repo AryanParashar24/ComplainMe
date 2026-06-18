@@ -56,22 +56,18 @@ def save_uploads(uploaded_files) -> list[Path]:
 
 
 def render_header():
-    # We use a container with display: flex to ensure perfect alignment
-    # between the image and the title.
-    st.markdown(
-        """
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-            <img src="logo.png" style="width: 55px;">
-            <h1 style="margin: 0; font-family: sans-serif; font-weight: 500;">Complain.io</h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # Create two columns: one for the logo, one for the title
+    # This keeps them close and perfectly aligned
+    col1, col2 = st.columns([0.1, 1], vertical_alignment="center")
     
-    st.markdown(
-        "Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
-        "find the right government officials, and forward it with your photos/videos attached."
-    )
+    with col1:
+        st.image("logo.png", width=55)
+        
+    with col2:
+        st.markdown("<h1 style='margin: 0; font-family: sans-serif; font-weight: 500;'>Complain.io</h1>", unsafe_allow_html=True)
+    
+    st.markdown("Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
+                "find the right government officials, and forward it with your photos/videos attached.")
     st.write("---")
     
 
