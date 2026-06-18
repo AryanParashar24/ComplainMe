@@ -33,7 +33,7 @@ from src.scraper.email_finder import discover_all_emails
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Complain.io",
-    page_icon="📢",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -56,10 +56,19 @@ def save_uploads(uploaded_files) -> list[Path]:
 
 
 def render_header():
-    st.title("📢 Complain.io")
+    # Defining the relative width of the columns for centering.
+    # Col1: left spacer, Col2: logo, Col3: right spacer.
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.image("logo.png", width=250, use_container_width=True)
+        st.markdown("<h1 style='text-align: center; color: black;'>Complain.io</h1>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # Display the platform description below the centered header.
     st.markdown(
-        "Write your complaint in **plain, informal language** — we'll turn it into a formal letter, "
-        "find the right government officials, and forward it with your photos/videos attached."
+        "<div style='text-align: center; color: gray;'>Write your complaint in <b>plain, informal language</b> — we'll turn it into a formal letter, "
+        "find the right government officials, and forward it with your photos/videos attached.</div>",
+        unsafe_allow_html=True
     )
 
 
